@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>WCS Coffee Plantation – CM Presentation</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+
+<link href="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
+
+<style>
+html,body{margin:0;padding:0;height:100%;font-family:Arial,sans-serif;}
+.app-header{
+  position:fixed;top:0;left:0;right:0;height:56px;
+  background:linear-gradient(90deg,#1b5e20,#2e7d32);
+  color:#fff;font-size:20px;font-weight:bold;
+  display:flex;align-items:center;padding-left:16px;
+  z-index:20;box-shadow:0 2px 6px rgba(0,0,0,0.3);
+}
+#map{position:absolute;top:56px;bottom:0;width:100%;}
+.control{
+  position:fixed;top:70px;left:10px;
+  background:#fff;padding:10px 14px;
+  font-size:14px;border-radius:6px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.25);
+  z-index:10;
+}
+.control label{display:block;margin-bottom:6px;}
+.legend{
+  position:fixed;bottom:20px;right:20px;
+  background:#fff;padding:10px 12px;
+  font-size:13px;border-radius:6px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.25);
+}
+.box{display:inline-block;width:14px;height:14px;margin-right:6px;}
+.maplibregl-popup-content{padding:0;border-radius:8px;overflow:hidden;}
+.popup-main-header{background:#2e7d32;color:#fff;font-size:16px;font-weight:bold;padding:10px;text-align:center;}
+.popup-body{padding:10px;font-size:13px;line-height:1.6;}
+</style>
+</head>
+
+<body>
+
+<header class="app-header">☕ WCS Coffee Plantation</header>
+<div id="map"></div>
+
+<div class="control">
+  <b>Basemap</b>
+  <label><input type="radio" name="bm" checked onclick="toggleSatellite(false)"> Streets</label>
+  <label><input type="radio" name="bm" onclick="toggleSatellite(true)"> Satellite</label>
+  <hr>
+  <b>Layers</b>
+  <label><input type="checkbox" checked onclick="toggleVillage()"> Village</label>
+  <label><input type="checkbox" checked onclick="togglePlot()"> Plot</label>
+  <label><input type="checkbox" checked onclick="toggleCoffee()"> Coffee 3D</label>
+</div>
+
+<div class="legend">
+  <div><span class="box" style="background:#2e7d32"></span> Coffee Plantation</div>
+  <div><span class="box" style="background:#ffd600"></span> Selected Plot</div>
+  <div><span class="box" style="background:red"></span> Plot Boundary</div>
+  <div><span class="box" style="background:black"></span> Village Boundary</div>
+</div>
+
+<script>
+const map = new maplibregl.Map({
+  container:'map',
+  style:'https://api.maptiler.com/maps/streets-v4/style.json?key=E6ZRsLot4eQsQImxowwm',
+  center:[82.9,18.7],
+  zoom:11,
+  pitch:55,
+  bearing:-15
+});
+
+map.addControl(new maplibregl.NavigationControl());
+
+// ===== LAYER STATE FLAGS =====
+let satelliteOn = false;
+let villageOn   = true;
+let plotOn      = true;
+let coffeeOn    = true;
+
+let selectedPlotId = null;
+
+map.on('load',()=>{
+
+  /* ---------- SATELLITE ---------- */
+  map.addSource('satellite',{
+    type:'raster',
+    tiles:['https://api.maptiler.com/maps/satellite/256/{z}/{x}/{y}.jpg?key=E6ZRsLot4eQsQImxowwm'],
+    tileSize:256
+  });
+  map.addLayer({
+    id:'satellite',
+    type:'raster',
+    source:'satellite',
+    layout:{ visibility:'none' }
+  });
+
+  /* ---------- VILLAGE ---------- */
+  map.addSource('village',{
+    type:'geojson',
+    data:'https://raw.githubusercontent.com/hemanya2003/WCS_Coffee_Plantation/main/VillageBoundary.geojson'
+  });
+  map.addLayer({
+    id:'village',
+    type:'line',
+    source:'village',
+    paint:{'line-color':'#000','line-width':2}
+  });
+
+  /* ---------- PLOT (generateId REQUIRED) ---------- */
+  map.addSource('plot',{
+    type:'geojson',
+    data:'https://raw.githubusercontent.com/hemanya2003/WCS_Coffee_Plantation/main/Plotboundary.geojson',
+    generateId:true
+  });
+
+  map.addLayer({
+    id:'plot-fill',
+    type:'fill',
+    source:'plot',
+    paint:{
+      'fill-color':[
+        'case',
+        ['boolean',['feature-state','selected'],false],
+        '#ffd600',
+        '#ffffff'
+      ],
+      'fill-opacity':[
+        'case',
+        ['boolean',['feature-state','selected'],false],
+        0.4,
+        0
+      ]
+    }
+  });
+
+  map.addLayer({
+    id:'plot-line',
+    type:'line',
+    source:'plot',
+    paint:{
+      'line-color':[
+        'case',
+        ['boolean',['feature-state','selected'],false],
+        '#ffd600',
+        '#ff0000'
+      ],
+      'line-width':[
+        'case',
+        ['boolean',['feature-state','selected'],false],
+        3,
+        1.5
+      ]
+    }
+  });
+
+  /* ---------- COFFEE ---------- */
+  map.addSource('coffee',{
+    type:'geojson',
+    data:'https://raw.githubusercontent.com/hemanya2003/WCS_Coffee_Plantation/main/WCS_CoffePlantation.geojson'
+  });
+  map.addLayer({
+    id:'coffee-3d',
+    type:'fill-extrusion',
+    source:'coffee',
+    paint:{
+      'fill-extrusion-color':'#2e7d32',
+      'fill-extrusion-height':30,
+      'fill-extrusion-base':0,
+      'fill-extrusion-opacity':0.8
+    }
+  });
+
+  /* ---------- PLOT CLICK ---------- */
+  map.on('click','plot-fill',(e)=>{
+    const f = e.features[0];
+
+    if(selectedPlotId !== null){
+      map.setFeatureState({source:'plot',id:selectedPlotId},{selected:false});
+    }
+    selectedPlotId = f.id;
+    map.setFeatureState({source:'plot',id:selectedPlotId},{selected:true});
+
+    const p = f.properties;
+    new maplibregl.Popup()
+      .setLngLat(e.lngLat)
+      .setHTML(`
+                <div class="popup-body">
+          <b>Village:</b> ${p.VILL_NAME}<br>
+          <b>Plot No:</b> ${p.PLOT_NO}<br>
+          <b>Tehsil:</b> ${p.TEH_NAME}<br>
+          <b>Area (Acre):</b> ${Number(p.AREA_ACRE).toFixed(2)}
+        </div>
+      `)
+      .addTo(map);
+  });
+
+  map.on('mouseenter','plot-fill',()=>map.getCanvas().style.cursor='pointer');
+  map.on('mouseleave','plot-fill',()=>map.getCanvas().style.cursor='');
+});
+
+/* ====== UI FUNCTIONS (100% SAFE) ====== */
+
+function toggleSatellite(show){
+  satelliteOn = show;
+  map.setLayoutProperty('satellite','visibility', show?'visible':'none');
+}
+
+function toggleVillage(){
+  villageOn = !villageOn;
+  map.setLayoutProperty('village','visibility', villageOn?'visible':'none');
+}
+
+function togglePlot(){
+  plotOn = !plotOn;
+  ['plot-fill','plot-line'].forEach(id=>{
+    map.setLayoutProperty(id,'visibility', plotOn?'visible':'none');
+  });
+}
+
+function toggleCoffee(){
+  coffeeOn = !coffeeOn;
+  map.setLayoutProperty('coffee-3d','visibility', coffeeOn?'visible':'none');
+}
+</script>
+</body>
+</html>
