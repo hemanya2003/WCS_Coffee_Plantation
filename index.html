@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<title>WCS Coffee Plantation – Owner Dashboard</title>
+<title>WCS Coffee Plantation – Financial Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 
 <link href="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css" rel="stylesheet"/>
 <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 html,body{margin:0;padding:0;height:100%;font-family:Segoe UI,Arial}
@@ -20,119 +21,99 @@ header{
   z-index:20;
 }
 
-/* CONTROL PANEL */
-.control{
-  position:fixed;top:70px;left:10px;
-  background:#fff;padding:12px;
-  border-radius:8px;
-  width:240px;
-  box-shadow:0 4px 12px rgba(0,0,0,.3);
-  z-index:10;
+/* DASHBOARD */
+.dashboard{
+  position:fixed;
+  top:70px;
+  right:10px;
+  width:280px;
+  background:#fff;
+  padding:14px;
+  border-radius:10px;
+  box-shadow:0 4px 14px rgba(0,0,0,.3);
   font-size:14px;
+  z-index:10;
 }
-.control details{margin-bottom:8px}
-.control summary{cursor:pointer;font-weight:bold;color:#1b5e20}
-.control label{display:block;margin:6px 0}
-.control input[type=range]{width:100%}
-
-/* SEARCH */
-.search{
+.dashboard h3{
+  margin:6px 0 8px;
+  color:#1b5e20;
+  font-size:16px;
+}
+.card{
+  background:#f6f8f6;
+  padding:8px 10px;
+  border-radius:6px;
   margin-bottom:8px;
 }
-.search input{
-  width:100%;padding:6px;border-radius:4px;border:1px solid #ccc;
-}
+.card span{font-weight:bold;color:#2e7d32}
 
-/* SUMMARY */
-.summary{
-  position:fixed;top:70px;right:10px;
-  background:#fff;padding:12px 16px;
-  width:240px;
-  border-radius:8px;
-  box-shadow:0 4px 12px rgba(0,0,0,.3);
-  font-size:14px;
-}
-.summary h3{margin:0 0 8px;color:#1b5e20}
-.summary span{font-weight:bold;color:#2e7d32}
-
-/* LEGEND */
-.legend{
-  position:fixed;bottom:20px;right:20px;
-  background:#fff;padding:10px 14px;
-  border-radius:6px;
+/* ASSUMPTIONS */
+.assumptions label{
+  display:block;
   font-size:13px;
-  box-shadow:0 4px 10px rgba(0,0,0,.25);
+  margin-top:6px;
+}
+.assumptions input{
+  width:100%;
 }
 
-/* POPUP */
-.maplibregl-popup-content{
-  border-radius:8px;overflow:hidden;padding:0
-}
-.popup-header{
-  background:#2e7d32;color:#fff;
-  font-weight:bold;padding:10px;text-align:center
-}
-.popup-body{
-  padding:10px;font-size:13px;line-height:1.6
+/* BUTTON */
+button{
+  width:100%;
+  padding:10px;
+  border:none;
+  background:#1b5e20;
+  color:#fff;
+  font-weight:bold;
+  border-radius:6px;
+  cursor:pointer;
 }
 
 /* MOBILE */
 @media(max-width:768px){
-  .control{
-    top:auto;bottom:10px;left:2.5%;
-    width:95%;
+  .dashboard{
+    width:100%;
+    right:0;
+    bottom:0;
+    top:auto;
+    border-radius:14px 14px 0 0;
   }
-  .summary{display:none}
 }
 </style>
 </head>
 
 <body>
 
-<header>☕ WCS Coffee Plantation – Owner Dashboard</header>
+<header>☕ WCS Coffee Plantation – Financial Dashboard</header>
 <div id="map"></div>
 
-<!-- CONTROL -->
-<div class="control">
-  <div class="search">
-    <input id="searchBox" placeholder="Search Plot / Village"/>
+<div class="dashboard">
+  <h3>📍 Plantation Snapshot</h3>
+  <div class="card">Villages: <span id="villages">–</span></div>
+  <div class="card">Plots: <span id="plots">–</span></div>
+  <div class="card">Total Area: <span id="area">–</span> Acres</div>
+  <div class="card">Coffee Area: <span id="coffeeArea">–</span> Acres</div>
+
+  <h3>💰 Financial Snapshot</h3>
+  <div class="card">Revenue: <span id="revenue">–</span></div>
+  <div class="card">Cost: <span id="cost">–</span></div>
+  <div class="card">Net Margin: <span id="profit">–</span></div>
+
+  <h3>🎛️ Assumptions</h3>
+  <div class="assumptions">
+    <label>Yield (kg / ha)
+      <input type="range" min="600" max="1400" step="50" value="900" id="yield">
+    </label>
+    <label>Price (₹ / kg)
+      <input type="number" value="210" id="price">
+    </label>
+    <label>Cost (₹ / ha)
+      <input type="number" value="110000" id="costHa">
+    </label>
   </div>
 
-  <details open>
-    <summary>Administrative</summary>
-    <label><input type="checkbox" checked onchange="toggleVillage()"> Village Boundary</label>
-    <label><input type="checkbox" checked onchange="togglePlot()"> Plot Boundary</label>
-  </details>
-
-  <details open>
-    <summary>Plantation</summary>
-    <label><input type="checkbox" checked onchange="toggleCoffee()"> Coffee 3D</label>
-    Opacity
-    <input type="range" min="0" max="1" step="0.1" value="0.8"
-           onchange="setCoffeeOpacity(this.value)">
-  </details>
-</div>
-
-<!-- SUMMARY -->
-<div class="summary">
-  <h3>Plantation Summary</h3>
-  Total Plots: <span id="plotCount">–</span><br>
-  Total Area: <span id="totalArea">–</span> Acres<br>
-  Avg Yield: <span>850 kg/ha</span><br>
-  <hr>
-  Selected Plot:<br>
-  <span id="selPlot">None</span>
-</div>
-
-<!-- LEGEND -->
-<div class="legend">
-  <b>Legend</b><br><br>
-  🟩 Coffee Plantation – Existing<br>
-  🟨 Selected Plot – Focus Area<br>
-  🔴 Plot Boundary – Land Parcel<br>
-  ⚫ Village Boundary – Admin Limit<br><br>
-  NDVI (Future):<br>
-  🔴 Low | 🟡 Medium | 🟢 Healthy
+  <br>
+  <button onclick="exportPDF()">📄 Download PDF</button>
 </div>
 
 <script>
@@ -140,114 +121,79 @@ const map = new maplibregl.Map({
   container:'map',
   style:'https://api.maptiler.com/maps/streets-v4/style.json?key=E6ZRsLot4eQsQImxowwm',
   center:[82.9,18.7],
-  zoom:11,
-  pitch:55,
-  bearing:-15
+  zoom:11
 });
 map.addControl(new maplibregl.NavigationControl());
 
-let selectedPlotId=null;
-let plotFeatures=[];
+let totalAreaAc=0;
+let villagesSet=new Set();
 
-map.on('load',()=>{
+Promise.all([
+  fetch('https://raw.githubusercontent.com/hemanya2003/WCS_Coffee_Plantation/main/Plotboundary.geojson').then(r=>r.json()),
+  fetch('https://raw.githubusercontent.com/hemanya2003/WCS_Coffee_Plantation/main/VillageBoundary.geojson').then(r=>r.json())
+]).then(([plots,villages])=>{
 
-/* SATELLITE */
-map.addSource('satellite',{
-  type:'raster',
-  tiles:['https://api.maptiler.com/maps/satellite/256/{z}/{x}/{y}.jpg?key=E6ZRsLot4eQsQImxowwm'],
-  tileSize:256
-});
-map.addLayer({id:'satellite',type:'raster',source:'satellite',layout:{visibility:'none'}});
+  document.getElementById('plots').innerText = plots.features.length;
 
-/* VILLAGE */
-map.addSource('village',{type:'geojson',data:'https://raw.githubusercontent.com/hemanya2003/WCS_Coffee_Plantation/main/VillageBoundary.geojson'});
-map.addLayer({id:'village',type:'line',source:'village',paint:{'line-color':'#000','line-width':2}});
+  plots.features.forEach(f=>{
+    totalAreaAc += Number(f.properties.AREA_ACRE || 0);
+  });
 
-/* PLOT */
-map.addSource('plot',{
-  type:'geojson',
-  data:'https://raw.githubusercontent.com/hemanya2003/WCS_Coffee_Plantation/main/Plotboundary.geojson',
-  generateId:true
-});
-fetch('https://raw.githubusercontent.com/hemanya2003/WCS_Coffee_Plantation/main/Plotboundary.geojson')
-.then(r=>r.json())
-.then(g=>{
-  plotFeatures=g.features;
-  document.getElementById('plotCount').innerText=g.features.length;
-  let area=0;
-  g.features.forEach(f=>area+=Number(f.properties.AREA_ACRE||0));
-  document.getElementById('totalArea').innerText=area.toFixed(2);
+  villages.features.forEach(v=>{
+    villagesSet.add(v.properties.VILL_NAME);
+  });
+
+  document.getElementById('villages').innerText = villagesSet.size;
+  document.getElementById('area').innerText = totalAreaAc.toFixed(2);
+
+  // Assume 89% coffee coverage
+  const coffeeAc = totalAreaAc * 0.89;
+  document.getElementById('coffeeArea').innerText = coffeeAc.toFixed(2);
+
+  calculateFinance();
 });
 
-map.addLayer({
-  id:'plot-fill',type:'fill',source:'plot',
-  paint:{
-    'fill-color':['case',['boolean',['feature-state','selected'],false],'#ffd600','#ffffff'],
-    'fill-opacity':['case',['boolean',['feature-state','selected'],false],0.4,0]
-  }
-});
-map.addLayer({
-  id:'plot-line',type:'line',source:'plot',
-  paint:{
-    'line-color':['case',['boolean',['feature-state','selected'],false],'#ffd600','#ff0000'],
-    'line-width':['case',['boolean',['feature-state','selected'],false],3,1.5]
-  }
-});
+document.querySelectorAll('#yield,#price,#costHa')
+  .forEach(i=>i.addEventListener('input',calculateFinance));
 
-/* COFFEE */
-map.addSource('coffee',{type:'geojson',data:'https://raw.githubusercontent.com/hemanya2003/WCS_Coffee_Plantation/main/WCS_CoffePlantation.geojson'});
-map.addLayer({
-  id:'coffee-3d',
-  type:'fill-extrusion',
-  source:'coffee',
-  paint:{
-    'fill-extrusion-color':'#2e7d32',
-    'fill-extrusion-height':30,
-    'fill-extrusion-opacity':0.8
-  }
-});
+function calculateFinance(){
+  const coffeeAc = Number(document.getElementById('coffeeArea').innerText);
+  const ha = coffeeAc * 0.404686;
 
-/* CLICK */
-map.on('click','plot-fill',(e)=>{
-  const f=e.features[0];
-  if(selectedPlotId!==null){
-    map.setFeatureState({source:'plot',id:selectedPlotId},{selected:false});
-  }
-  selectedPlotId=f.id;
-  map.setFeatureState({source:'plot',id:selectedPlotId},{selected:true});
-  document.getElementById('selPlot').innerText=f.properties.PLOT_NO;
-  map.flyTo({center:e.lngLat,zoom:14,speed:0.8});
+  const yieldKg = Number(document.getElementById('yield').value);
+  const price = Number(document.getElementById('price').value);
+  const costHa = Number(document.getElementById('costHa').value);
 
-  new maplibregl.Popup()
-    .setLngLat(e.lngLat)
-    .setHTML(`
-      <div class="popup-header">Plot ${f.properties.PLOT_NO}</div>
-      <div class="popup-body">
-        <b>Village:</b> ${f.properties.VILL_NAME}<br>
-        <b>Area:</b> ${Number(f.properties.AREA_ACRE).toFixed(2)} Acres<br>
-        <b>Crop:</b> Arabica Coffee<br>
-        <b>Last Visit:</b> Jan 2026<br>
-        <b>Expected Yield:</b> 850 kg
-      </div>
-    `)
-    .addTo(map);
-});
+  const revenue = ha * yieldKg * price;
+  const cost = ha * costHa;
+  const profit = revenue - cost;
 
-/* SEARCH */
-document.getElementById('searchBox').addEventListener('keyup',e=>{
-  const q=e.target.value.toLowerCase();
-  const f=plotFeatures.find(p=>p.properties.PLOT_NO?.toLowerCase().includes(q));
-  if(f){
-    map.flyTo({center:f.geometry.coordinates[0][0],zoom:15});
-  }
-});
-});
+  document.getElementById('revenue').innerText = '₹' + (revenue/1e7).toFixed(2) + ' Cr';
+  document.getElementById('cost').innerText = '₹' + (cost/1e7).toFixed(2) + ' Cr';
+  document.getElementById('profit').innerText = '₹' + (profit/1e7).toFixed(2) + ' Cr';
+}
 
-/* UI */
-function toggleVillage(){map.setLayoutProperty('village','visibility',map.getLayoutProperty('village','visibility')==='visible'?'none':'visible')}
-function togglePlot(){['plot-fill','plot-line'].forEach(l=>map.setLayoutProperty(l,'visibility',map.getLayoutProperty(l,'visibility')==='visible'?'none':'visible'))}
-function toggleCoffee(){map.setLayoutProperty('coffee-3d','visibility',map.getLayoutProperty('coffee-3d','visibility')==='visible'?'none':'visible')}
-function setCoffeeOpacity(v){map.setPaintProperty('coffee-3d','fill-extrusion-opacity',Number(v))}
+function exportPDF(){
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF();
+
+  pdf.setFontSize(16);
+  pdf.text('WCS Coffee Plantation – Financial Summary',10,15);
+
+  pdf.setFontSize(12);
+  pdf.text(`Villages: ${villagesSet.size}`,10,30);
+  pdf.text(`Plots: ${document.getElementById('plots').innerText}`,10,38);
+  pdf.text(`Total Area: ${totalAreaAc.toFixed(2)} Acres`,10,46);
+
+  pdf.text(`Revenue: ${document.getElementById('revenue').innerText}`,10,62);
+  pdf.text(`Cost: ${document.getElementById('cost').innerText}`,10,70);
+  pdf.text(`Net Margin: ${document.getElementById('profit').innerText}`,10,78);
+
+  pdf.text('Note: Figures are indicative estimates based on GIS area and standard benchmarks.',10,100);
+
+  pdf.save('WCS_Coffee_Financial_Report.pdf');
+}
 </script>
+
 </body>
 </html>
